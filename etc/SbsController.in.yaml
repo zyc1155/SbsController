@@ -1,0 +1,31 @@
+---
+ObserverPipelines:
+  name: MainObserverPipeline
+  gui: true
+  observers:
+    - type: Encoder
+    # - type: Attitude
+    - type: KinematicInertial
+      config:
+        anchorFrame:
+          maxAnchorFrameDiscontinuity: 0.05 # [m]
+    - type: BodySensor
+      update: true
+      config:
+        bodySensor: FloatingBase
+
+constraints:
+  - type: kinematics
+    damper: [0.1, 0.01, 0.5]
+  - type: contact
+  - type: collision
+    useMinimal: true
+  - type: compoundJoint                                         
+
+# constraints:
+#   - type: kinematics
+#     damper: [0.1, 0.01, 0.5]
+# collisions:
+#   - type: collision
+#     useMinimal: true
+# contacts: []
