@@ -4,15 +4,12 @@ ObserverPipelines:
   gui: true
   observers:
     - type: Encoder
-    # - type: Attitude
+    - type: Attitude
     - type: KinematicInertial
       config:
         anchorFrame:
           maxAnchorFrameDiscontinuity: 0.05 # [m]
-    - type: BodySensor
-      update: true
-      config:
-        bodySensor: FloatingBase
+
 
 constraints:
   - type: kinematics
