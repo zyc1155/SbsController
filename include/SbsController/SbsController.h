@@ -3,12 +3,12 @@
 #include <stdio.h>
 #include <mc_control/mc_controller.h>
 // #include <mc_tasks/PostureTask.h>
-#include "ModifiedTasks.h"
+#include "SbsController/ModifiedTasks.h"
 #include <ros/ros.h>
-#include <mc_rtc/ros.h>
+#include <ros/callback_queue.h>
 #include "geometry_msgs/PointStamped.h"
 
-#include "api.h"
+#include "SbsController/api.h"
 
 using Eigen::Matrix3d;
 using Eigen::MatrixXd;
@@ -48,8 +48,12 @@ private:
   // Falcon_Driver right_falcon, left_falcon;
   void CommandCallback_Left(const geometry_msgs::PointStamped &msg);
   void CommandCallback_Right(const geometry_msgs::PointStamped &msg);
-  // ros::NodeHandle nh;
+
+  std::shared_ptr<ros::NodeHandle> nh_;
+  // ros::CallbackQueue callbackQueue_;
+  ros::AsyncSpinner spinner;
   ros::Subscriber right_falcon, left_falcon;
+
   mc_rtc::Configuration config_;
 
   // std::shared_ptr<mc_tasks::OrientationTask> otTask;

@@ -1,7 +1,8 @@
-#include "SbsController.h"
+#include "SbsController/SbsController.h"
+#include <mc_rtc/ros.h>
 
 SbsController::SbsController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rtc::Configuration &config)
-    : mc_control::MCController(rm, dt)
+    : mc_control::MCController(rm, dt),spinner(2)
 {
   config_.load(config);
   solver().addConstraintSet(contactConstraint);
@@ -104,11 +105,21 @@ SbsController::SbsController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rt
                                                   leftFootRatio);
                         });
 
-                        std::shared_ptr<ros::NodeHandle> nh = mc_rtc::ROSBridge::get_node_handle();
-  left_falcon = nh->subscribe("ros_falcon_left/falconPos", 10, &SbsController::CommandCallback_Left, this);
-  right_falcon = nh->subscribe("ros_falcon_right/falconPos", 10, &SbsController::CommandCallback_Right, this);
-  
-                        createGUI();
+  // Skip if ROS is not initialized
+  if (!mc_rtc::ROSBridge::get_node_handle())
+  {
+    mc_rtc::log::error("[TeleopState] ROS is not initialized.");
+    return;
+  }
+
+  // Setup ROS
+  nh_ = mc_rtc::ROSBridge::get_node_handle();
+  // Use a dedicated queue so as not to call callbacks of other modules
+  left_falcon = nh_->subscribe("ros_falcon_left/falconPos", 10, &SbsController::CommandCallback_Left, this);
+  right_falcon = nh_->subscribe("ros_falcon_right/falconPos", 10, &SbsController::CommandCallback_Right, this);
+  spinner.start();
+
+  createGUI();
 
   logger().addLogEntries(
       this,
@@ -358,7 +369,6 @@ void SbsController::state_swiching()
   }
   else if (ctrl_mode == 3)
   {
-
   }
   else if (ctrl_mode == 5)
   {
@@ -497,7 +507,6 @@ void SbsController::set_desiredTask()
   }
 }
 
-
 Vector3d SbsController::sat_func(double _lim, const Vector3d &val)
 {
   double lim = fabs(_lim);
@@ -574,9 +583,9 @@ void SbsController::createGUI()
 
 void SbsController::CommandCallback_Left(const geometry_msgs::PointStamped &msg)
 {
-  posRA << -(msg.point.z  - 0.12), -msg.point.x, msg.point.y;
+  posRA << -(msg.point.z - 0.12), -msg.point.x, msg.point.y;
   if (first)
-  posRAp = posRA;
+    posRAp = posRA;
 
   vel_posRA = (posRA - posRAp) / timeStep;
 
@@ -584,13 +593,11 @@ void SbsController::CommandCallback_Left(const geometry_msgs::PointStamped &msg)
 }
 void SbsController::CommandCallback_Right(const geometry_msgs::PointStamped &msg)
 {
-  posRB << -(msg.point.z  - 0.12), -msg.point.x, msg.point.y;
+  posRB << -(msg.point.z - 0.12), -msg.point.x, msg.point.y;
   if (first)
-  posRBp = posRB;
+    posRBp = posRB;
 
   vel_posRB = (posRB - posRBp) / timeStep;
 
   posRBp = posRB;
 }
-
-CONTROLLER_CONSTRUCTOR("SbsController", SbsController)
