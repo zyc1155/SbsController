@@ -2,7 +2,7 @@
 #include <mc_rtc/ros.h>
 
 SbsController::SbsController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rtc::Configuration &config)
-    : mc_control::MCController(rm, dt),spinner(2)
+    : mc_control::MCController(rm, dt)
 {
   config_.load(config);
   solver().addConstraintSet(contactConstraint);
@@ -113,11 +113,12 @@ SbsController::SbsController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rt
   }
 
   // Setup ROS
-  nh_ = mc_rtc::ROSBridge::get_node_handle();
+  nh_ = std::make_shared<ros::NodeHandle>();
+  nh_->setCallbackQueue(&spinner);
+
   // Use a dedicated queue so as not to call callbacks of other modules
-  left_falcon = nh_->subscribe("ros_falcon_left/falconPos", 10, &SbsController::CommandCallback_Left, this);
-  right_falcon = nh_->subscribe("ros_falcon_right/falconPos", 10, &SbsController::CommandCallback_Right, this);
-  spinner.start();
+  left_falcon = nh_->subscribe("/ros_falcon_left/falconPos", 10, &SbsController::CommandCallback_Left, this);
+  right_falcon = nh_->subscribe("/ros_falcon_right/falconPos", 10, &SbsController::CommandCallback_Right, this);
 
   createGUI();
 
@@ -161,6 +162,8 @@ SbsController::SbsController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rt
 
 bool SbsController::run()
 {
+
+  spinner.callAvailable(ros::WallDuration());
 
   if (first)
   {

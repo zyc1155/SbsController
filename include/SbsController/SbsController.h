@@ -51,7 +51,7 @@ private:
 
   std::shared_ptr<ros::NodeHandle> nh_;
   // ros::CallbackQueue callbackQueue_;
-  ros::AsyncSpinner spinner;
+  ros::CallbackQueue spinner;
   ros::Subscriber right_falcon, left_falcon;
 
   mc_rtc::Configuration config_;
