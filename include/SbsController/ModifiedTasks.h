@@ -1,5 +1,6 @@
 #pragma once
 
+#include <mc_tasks/OrientationTask.h>
 #include <mc_tasks/EndEffectorTask.h>
 #include <mc_tasks/lipm_stabilizer/StabilizerTask.h>
 
