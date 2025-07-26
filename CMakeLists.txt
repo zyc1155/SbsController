@@ -11,6 +11,11 @@ set(PROJECT_NAME SbsController)
 set(PROJECT_DESCRIPTION "SbsController")
 set(PROJECT_URL "")
 
+option(USE_FALCON "Use falcon" OFF)
+if(USE_FALCON)
+  add_definitions(-DUSE_FALCON)
+endif()
+
 include(cmake/base.cmake)
 project(${PROJECT_NAME} CXX)
 

@@ -8,7 +8,7 @@ ObserverPipelines:
     - type: KinematicInertial
       config:
         anchorFrame:
-          maxAnchorFrameDiscontinuity: 0.05 # [m]
+          maxAnchorFrameDiscontinuity: 1.0 # [m]
 
 
 constraints:
