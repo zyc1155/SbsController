@@ -7,6 +7,7 @@
 #   ${PROJECT_SOURCE_DIR}/include/SbsController/SbsController.h
 #   ${PROJECT_SOURCE_DIR}/include/SbsController/ModifiedTasks.h
 # )
+option(USE_FALCON "Use falcon" OFF)
 
 add_library(${PROJECT_NAME} SHARED
   SbsController.cpp
@@ -15,6 +16,9 @@ add_library(${PROJECT_NAME} SHARED
 target_link_libraries(${PROJECT_NAME} PUBLIC mc_rtc::mc_control_fsm mc_rtc::mc_rtc_ros)
 target_link_libraries(${PROJECT_NAME} PUBLIC ${catkin_LIBRARIES})
 
+if(USE_FALCON)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE USE_FALCON)
+endif()
 
 install(TARGETS ${PROJECT_NAME} DESTINATION ${MC_RTC_LIBDIR} EXPORT ${TARGETS_EXPORT_NAME})
 

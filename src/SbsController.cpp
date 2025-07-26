@@ -153,31 +153,6 @@ SbsController::SbsController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rt
   mc_rtc::log::success("SbsController init done ");
 }
 
-bool SbsController::run()
-{
-
-#ifdef USE_FALCON
-  spinner.callAvailable(ros::WallDuration());
-#endif
-
-  get_values();
-  state_swiching();
-  set_desiredVel();
-  set_desiredTask();
-
-  if (!changed && clock() > 2.0)
-  {
-    if (ctrl_mode2 == 0)
-      anchorFrame = realRobot().surfacePose("LeftFoot");
-    else
-      anchorFrame = realRobot().surfacePose("RightFoot");
-    mc_rtc::log::info("anchorFrame is modified!!!!!!!!!!!!!!!!");
-    changed = true;
-  }
-
-  return mc_control::MCController::run();
-}
-
 void SbsController::reset(const mc_control::ControllerResetData &reset_data)
 {
   mc_control::MCController::reset(reset_data);
@@ -192,6 +167,8 @@ void SbsController::reset(const mc_control::ControllerResetData &reset_data)
   ctrl_mode = 0;
   ctrl_mode2 = 0;
   timer_mode = 0;
+  start_time = std::chrono::high_resolution_clock::now();
+  passed_time = .0;
 
   W_p_AcW = realRobot().surfacePose("LeftFootCenter").translation();
   W_p_BcW = realRobot().surfacePose("RightFootCenter").translation();
@@ -235,6 +212,33 @@ void SbsController::reset(const mc_control::ControllerResetData &reset_data)
   otTask->reset();
   efTask_left->reset();
   efTask_right->reset();
+}
+
+
+bool SbsController::run()
+{
+
+#ifdef USE_FALCON
+  spinner.callAvailable(ros::WallDuration());
+#endif
+
+  passed_time = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - start_time).count();
+  get_values();
+  state_swiching();
+  set_desiredVel();
+  set_desiredTask();
+
+  if (!changed && passed_time > 2.0)
+  {
+    if (ctrl_mode2 == 0)
+      anchorFrame = realRobot().surfacePose("LeftFoot");
+    else
+      anchorFrame = realRobot().surfacePose("RightFoot");
+    mc_rtc::log::info("anchorFrame is modified!!!!!!!!!!!!!!!!");
+    changed = true;
+  }
+
+  return mc_control::MCController::run();
 }
 
 void SbsController::get_values()
@@ -494,21 +498,10 @@ void SbsController::set_desiredTask()
 
   lipmTask->target(W_p_GW_d, W_v_GW_d, W_a_GW_d, Q_epd);
 
-  if ((ctrl_mode == 0 || ctrl_mode == 1 || ctrl_mode == 5))
-  {
-    // otTask->orientation( Matrix3d::Identity());
-  }
-  else if (ctrl_mode2 == 0)
-  {
+  if (ctrl_mode == 2)
     efTask_right->set_ef_pose(sva::PTransformd(W_R_B_ref, W_p_B_ref));
-
-    // otTask->orientation(W_R_H);
-  }
-  else if (ctrl_mode2 == 1)
-  {
+  else if (ctrl_mode == 6)
     efTask_left->set_ef_pose(sva::PTransformd(W_R_A_ref, W_p_A_ref));
-    // otTask->orientation(W_R_H);
-  }
 }
 
 double SbsController::sat_func(double lim, double val)
@@ -549,6 +542,13 @@ void SbsController::createGUI()
                                                                     { return W_p_A_ref; }),
                     mc_rtc::gui::Point3D("Point_Right", mc_rtc::gui::PointConfig(mc_rtc::gui::Color(1, 1, 0), 0.075), [this]()
                                          { return W_p_B_ref; }));
+#else
+  gui()->addElement({"SbsController", "Task"}, mc_rtc::gui::Point3D("Point_Left", [this]()
+                                                                    { return W_p_A_ref; }, [this](const Vector3d &pos)
+                                                                    { W_p_A_ref = pos; }),
+                    mc_rtc::gui::Point3D("Point_Right", [this]()
+                                         { return W_p_B_ref; }, [this](const Vector3d &pos)
+                                         { W_p_B_ref = pos; }));
 #endif
 }
 
