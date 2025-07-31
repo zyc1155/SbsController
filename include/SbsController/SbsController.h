@@ -61,7 +61,7 @@ private:
   double passed_time, timer_mode;
   int ctrl_mode, ctrl_mode2;
   Eigen::Vector6d dof;
-  Vector2d copAdmittance_ds, copAdmittance_ss;
+  Vector2d copAdmittance_ds, copAdmittance_ss, dcmGainP_ds, dcmGainP_ss, dcmGainI_ds, dcmGainI_ss, dcmGainD_ds, dcmGainD_ss;
 
   // for new trajectory
   Vector3d direction;

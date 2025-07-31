@@ -11,6 +11,11 @@ SbsController::SbsController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rt
   solver().addConstraintSet(selfCollisionConstraint);
   solver().addConstraintSet(*compoundJointConstraint);
 
+  solver().setContacts({{}});
+  dof << 0, 0, 1, 1, 1, 0;
+  addContact({robot().name(), "ground", "LeftFoot", "AllGround", 0.7, dof});
+  addContact({robot().name(), "ground", "RightFoot", "AllGround", 0.7, dof});
+
   solver().addTask(postureTask);
 
   std::vector<std::string> activeJoints = {"Root", "RCY", "RCR", "RCP", "RKP", "RAP", "RAR", "LCY", "LCR", "LCP", "LKP", "LAP", "LAR"};
@@ -40,16 +45,63 @@ SbsController::SbsController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rt
   copAdmittance_ss << 0.005, 0.008;
   copAdmittance_ds << 0.01, 0.01;
 
+  dcmGainP_ds << 2.0, 2.0;
+  dcmGainP_ss << 1.5, 2.0;
+
+  dcmGainI_ds << 15, 15;
+  dcmGainI_ss = dcmGainI_ds;
+
+  dcmGainD_ds << 0.2, 0.2;
+  dcmGainD_ss = dcmGainD_ds;
+
   auto stabiConf = robot().module().defaultLIPMStabilizerConfiguration();
   stabiConf.comHeight = HEIGHTREF;
   stabiConf.torsoPitch = 0;
-  stabiConf.copAdmittance = copAdmittance_ds;
   stabiConf.zmpcc.comAdmittance = Vector2d{0.0, 0.0};
+  stabiConf.copAdmittance = copAdmittance_ds;
   stabiConf.dcmPropGain = 1.5; // 2.0;
   stabiConf.dcmIntegralGain = 15;
   stabiConf.dcmDerivGain = 0.2;
   stabiConf.dcmDerivatorTimeConstant = 5;
   stabiConf.dcmIntegratorTimeConstant = 5; // 5.0
+
+  W_T_A = realRobot().surfacePose("LeftFootCenter");
+  W_p_AcW = W_T_A.translation();
+  W_T_B = realRobot().surfacePose("RightFootCenter");
+  W_p_BcW = W_T_B.translation();
+  // W_p_GW_ref = (robot().surfacePose("LeftFootCenter").translation() + robot().surfacePose("RightFootCenter").translation()) / 2.0;
+  W_p_GW_ref = (W_p_AcW + W_p_BcW) / 2.0;
+  W_p_GW_ref(2) += HEIGHTREF;
+
+  W_p_GW = realRobot().com();
+  W_p_GW_d = W_p_GW;
+  if ((W_p_GW_ref - W_p_GW_d).norm() > 1e-6)
+    direction = (W_p_GW_ref - W_p_GW_d).normalized();
+  else
+    direction << .0, .0, -1;
+
+  W_R_A_ref = Matrix3d::Identity();
+  W_R_B_ref = Matrix3d::Identity();
+
+  W_p_AaW = realRobot().frame("Lleg_Link5").position().translation();
+  W_p_BaW = realRobot().frame("Rleg_Link5").position().translation();
+
+  W_p_A_ref = W_p_AaW;
+  W_p_B_ref = W_p_BaW;
+
+  W_p_A_ref_p = W_p_A_ref;
+  W_p_B_ref_p = W_p_B_ref;
+
+  W_p_AB_ref_0 = W_p_AaW - W_p_BaW;
+  W_p_BA_ref_0 = W_p_BaW - W_p_AaW;
+
+  W_p_AB_ref = W_p_AB_ref_0;
+  W_p_BA_ref = W_p_BA_ref_0;
+  W_p_AB_ref_p = W_p_AB_ref;
+  W_p_BA_ref_p = W_p_BA_ref;
+
+  W_v_A_ref = Vector3d::Zero();
+  W_v_B_ref = Vector3d::Zero();
 
   lipmTask = std::make_shared<mc_tasks::lipm_stabilizer::StabilizerTask>(
       solver().robots(),
@@ -64,8 +116,6 @@ SbsController::SbsController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rt
   lipmTask->configure(stabiConf);
   lipmTask->setContacts({mc_tasks::lipm_stabilizer::ContactState::Left, mc_tasks::lipm_stabilizer::ContactState::Right});
 
-  solver().addTask(lipmTask);
-
   // for new trajectory
   omega = sqrt(GRAVITY / HEIGHTREF);
 
@@ -77,7 +127,6 @@ SbsController::SbsController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rt
   kd_dcm = 2 * sqrt(kp_dcm);
   /////
   coff_falcon << 10.0, 5.0, 5.0;
-  dof << 0, 0, 1, 1, 1, 0;
 
   datastore().make_call("KinematicAnchorFrame::" + robot().name(),
                         [this](const mc_rbdyn::Robot &robot_)
@@ -114,6 +163,8 @@ SbsController::SbsController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rt
       { return W_T_A; },
       "rightfoot_transform", [this]()
       { return W_T_B; },
+      "target_COM", [this]()
+      { return W_p_GW_ref; },
       "ref_COM", [this]()
       { return W_p_GW_d; },
       "real_COM_p", [this]()
@@ -144,58 +195,25 @@ void SbsController::reset(const mc_control::ControllerResetData &reset_data)
 {
   mc_control::MCController::reset(reset_data);
 
-  solver().setContacts({{}});
-
-  addContact({robot().name(), "ground", "LeftFoot", "AllGround", 0.7, dof});
-  addContact({robot().name(), "ground", "RightFoot", "AllGround", 0.7, dof});
-
   ctrl_mode = 0;
   ctrl_mode2 = 0;
   timer_mode = 0;
   start_time = std::chrono::high_resolution_clock::now();
   passed_time = .0;
 
-  W_T_A = realRobot().surfacePose("LeftFootCenter");
-  W_p_AcW = W_T_A.translation();
-  W_T_B = realRobot().surfacePose("RightFootCenter");
-  W_p_BcW = W_T_B.translation();
-  W_p_GW_ref = (W_p_AcW + W_p_BcW) / 2.0;
-  W_p_GW_ref(2) += HEIGHTREF;
-  W_p_GW = realRobot().com();
-  W_p_GW_d = W_p_GW;
-  if ((W_p_GW_ref - W_p_GW_d).norm() > 1e-6)
-    direction = (W_p_GW_ref - W_p_GW_d).normalized();
-  else
-    direction << .0, .0, 1;
-
-  W_R_A_ref = Matrix3d::Identity();
-  W_R_B_ref = Matrix3d::Identity();
-
-  W_p_AaW = realRobot().frame("Lleg_Link5").position().translation();
-  W_p_BaW = realRobot().frame("Rleg_Link5").position().translation();
-
-  W_p_A_ref = W_p_AaW;
-  W_p_B_ref = W_p_BaW;
-
-  W_p_A_ref_p = W_p_A_ref;
-  W_p_B_ref_p = W_p_B_ref;
-
-  W_p_AB_ref_0 = W_p_AaW - W_p_BaW;
-  W_p_BA_ref_0 = W_p_BaW - W_p_AaW;
-
-  W_p_AB_ref = W_p_AB_ref_0;
-  W_p_BA_ref = W_p_BA_ref_0;
-  W_p_AB_ref_p = W_p_AB_ref;
-  W_p_BA_ref_p = W_p_BA_ref;
-
-  W_v_A_ref = Vector3d::Zero();
-  W_v_B_ref = Vector3d::Zero();
 
   efTask_left->dimWeight(Vector3d::Zero());
   efTask_right->dimWeight(Vector3d::Zero());
 
-  lipmTask->reset();
-  // lipmTask->setCtrlMode(ctrl_mode);
+    solver().addTask(lipmTask);
+
+  lipmTask->setCtrlMode(ctrl_mode);
+  lipmTask->copAdmittance(copAdmittance_ds);
+  lipmTask->dcmGains(dcmGainP_ds, dcmGainI_ds, dcmGainD_ds);
+
+  // lipmTask->reset();
+
+
   otTask->reset();
   efTask_left->reset();
   efTask_right->reset();
@@ -263,8 +281,7 @@ void SbsController::get_values()
 
   W_T_B = realRobot().surfacePose("RightFootCenter");
   W_p_BcW = W_T_B.translation();
-  W_R_B=W_T_B.rotation();
-
+  W_R_B = W_T_B.rotation();
 
   W_p_AaW = realRobot().frame("Lleg_Link5").position().translation();
   W_p_BaW = realRobot().frame("Rleg_Link5").position().translation();
@@ -332,6 +349,7 @@ void SbsController::state_swiching()
       lipmTask->setContacts({mc_tasks::lipm_stabilizer::ContactState::Left});
       lipmTask->setCtrlMode(ctrl_mode);
       lipmTask->copAdmittance(copAdmittance_ss);
+      lipmTask->dcmGains(dcmGainP_ss, dcmGainI_ss, dcmGainD_ss);
       W_R_B_ref = W_R_B;
     }
   }
@@ -349,6 +367,7 @@ void SbsController::state_swiching()
       lipmTask->setContacts({mc_tasks::lipm_stabilizer::ContactState::Left, mc_tasks::lipm_stabilizer::ContactState::Right});
       lipmTask->setCtrlMode(ctrl_mode);
       lipmTask->copAdmittance(copAdmittance_ds);
+      lipmTask->dcmGains(dcmGainP_ds, dcmGainI_ds, dcmGainD_ds);
     }
   }
   else if (ctrl_mode == 3)
@@ -385,6 +404,7 @@ void SbsController::state_swiching()
       lipmTask->setContacts({mc_tasks::lipm_stabilizer::ContactState::Right});
       lipmTask->setCtrlMode(ctrl_mode);
       lipmTask->copAdmittance(copAdmittance_ss);
+      lipmTask->dcmGains(dcmGainP_ss, dcmGainI_ss, dcmGainD_ss);
       W_R_A_ref = W_R_A;
     }
   }
@@ -401,6 +421,7 @@ void SbsController::state_swiching()
       lipmTask->setContacts({mc_tasks::lipm_stabilizer::ContactState::Left, mc_tasks::lipm_stabilizer::ContactState::Right});
       lipmTask->setCtrlMode(ctrl_mode);
       lipmTask->copAdmittance(copAdmittance_ds);
+      lipmTask->dcmGains(dcmGainP_ds, dcmGainI_ds, dcmGainD_ds);
     }
   }
   else if (ctrl_mode == 7)
