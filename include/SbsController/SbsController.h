@@ -11,7 +11,6 @@
 
 using Eigen::Matrix3d;
 using Eigen::MatrixXd;
-
 using Eigen::Vector2d;
 using Eigen::Vector3d;
 using Eigen::VectorXd;
@@ -47,6 +46,8 @@ private:
   std::shared_ptr<ros::NodeHandle> nh_;
   ros::CallbackQueue spinner;
   ros::Subscriber right_falcon, left_falcon;
+
+  Vector2d dcmGainP_ds, dcmGainP_ss, dcmGainI_ds, dcmGainI_ss, dcmGainD_ds, dcmGainD_ss;
 
   mc_rtc::Configuration config_;
 
