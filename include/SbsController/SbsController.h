@@ -55,14 +55,13 @@ private:
   std::shared_ptr<mc_tasks::lipm_stabilizer::StabilizerTask> lipmTask;
 
   FILE *fp;
-  bool changed;
   std::chrono::_V2::system_clock::time_point start_time;
   sva::PTransformd anchorFrame;
   double omega;
   double passed_time, timer_mode;
   int ctrl_mode, ctrl_mode2;
   Eigen::Vector6d dof;
-  double copAdmittance_ds, copAdmittance_ss;
+  Vector2d copAdmittance_ds, copAdmittance_ss;
 
   // for new trajectory
   Vector3d direction;
