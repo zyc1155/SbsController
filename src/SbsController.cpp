@@ -106,18 +106,14 @@ SbsController::SbsController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rt
 
   logger().addLogEntries(
       this,
-      "leftfoot_rotation", [this]()
-      { return W_R_A; },
-      "leftfoot_translation_center", [this]()
-      { return W_p_AcW; },
-      "leftfoot_translation_ankle", [this]()
+      "leftfoot_ankelPosition", [this]()
       { return W_p_AaW; },
-      "rightfoot_rotation", [this]()
-      { return W_R_B; },
-      "rightfoot_translation_center", [this]()
-      { return W_p_BcW; },     
-      "rightfoot_translation_ankle", [this]()
+      "rightfoot_ankelPosition", [this]()
       { return W_p_BaW; },
+      "leftfoot_transform", [this]()
+      { return W_T_A; },
+      "rightfoot_transform", [this]()
+      { return W_T_B; },
       "ref_COM", [this]()
       { return W_p_GW_d; },
       "real_COM_p", [this]()
@@ -159,8 +155,10 @@ void SbsController::reset(const mc_control::ControllerResetData &reset_data)
   start_time = std::chrono::high_resolution_clock::now();
   passed_time = .0;
 
-  W_p_AcW = realRobot().surfacePose("LeftFootCenter").translation();
-  W_p_BcW = realRobot().surfacePose("RightFootCenter").translation();
+  W_T_A = realRobot().surfacePose("LeftFootCenter");
+  W_p_AcW = W_T_A.translation();
+  W_T_B = realRobot().surfacePose("RightFootCenter");
+  W_p_BcW = W_T_B.translation();
   W_p_GW_ref = (W_p_AcW + W_p_BcW) / 2.0;
   W_p_GW_ref(2) += HEIGHTREF;
   W_p_GW = realRobot().com();
@@ -259,14 +257,16 @@ void SbsController::get_values()
   Q_ep = W_p_GW - W_a_GW / (omega * omega);
   Q_ep(2) -= HEIGHTREF;
 
-  W_R_A = realRobot().surfacePose("LeftFootCenter").rotation();
-  W_p_AcW = realRobot().surfacePose("LeftFootCenter").translation();
+  W_T_A = realRobot().surfacePose("LeftFootCenter");
+  W_p_AcW = W_T_A.translation();
+  W_R_A = W_T_A.rotation();
+
+  W_T_B = realRobot().surfacePose("RightFootCenter");
+  W_p_BcW = W_T_B.translation();
+  W_R_B=W_T_B.rotation();
+
 
   W_p_AaW = realRobot().frame("Lleg_Link5").position().translation();
-
-  W_R_B = realRobot().surfacePose("RightFootCenter").rotation();
-  W_p_BcW = realRobot().surfacePose("RightFootCenter").translation();
-
   W_p_BaW = realRobot().frame("Rleg_Link5").position().translation();
 
   if (A_f_A(2) > 1e-1)

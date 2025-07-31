@@ -71,6 +71,7 @@ private:
   double kp_dcm, kd_dcm;
   void cal_motion(const Vector3d &target, const Vector3d &W_p_GW_0, const Vector3d &W_v_GW_0, const Vector3d &W_a_GW_0, const Vector3d &n);
   //////
+  sva::PTransformd W_T_A, W_T_B;
   Vector3d W_p_GW_ref, Q_ep, Q_epd, W_Q_W, W_Q_A, W_Q_B, W_Q, A_Q_A, B_Q_B;
   Vector3d W_p_GW_d, W_v_GW_d, W_a_GW_d;
   Vector3d W_p_GW, W_v_GW, W_a_GW;
