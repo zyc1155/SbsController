@@ -1,6 +1,5 @@
 #include "SbsController/SbsController.h"
 #include <mc_rtc/ros.h>
-#include <memory>
 
 SbsController::SbsController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rtc::Configuration &config)
     : mc_control::MCController(rm, dt)
@@ -47,8 +46,8 @@ SbsController::SbsController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rt
   copAdmittance_ss = {0.005, 0.008};
   copAdmittance_ds = {0.01, 0.01};
 
-  dcmGainP_ds << 2.0, 2.0;
-  dcmGainP_ss << 1.5, 2.0;
+  dcmGainP_ds << 2.5, 2.5;
+  dcmGainP_ss << 1.5, 2.5;
 
   dcmGainI_ds << 15, 15;
   dcmGainI_ss = dcmGainI_ds;
@@ -115,6 +114,8 @@ SbsController::SbsController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rt
   // Use a dedicated queue so as not to call callbacks of other modules
   left_falcon = nh_->subscribe("/ros_falcon_left/falconPos", 10, &SbsController::CommandCallback_Left, this);
   right_falcon = nh_->subscribe("/ros_falcon_right/falconPos", 10, &SbsController::CommandCallback_Right, this);
+  left_falcon_button = nh_->subscribe("/ros_falcon_left/falcon_button", 1, &SbsController::ButtonChanged_Left, this);
+  right_falcon_button = nh_->subscribe("/ros_falcon_right/falcon_button", 1, &SbsController::ButtonChanged_Right, this);
 #endif
 
   createGUI();
@@ -164,6 +165,9 @@ void SbsController::reset(const mc_control::ControllerResetData &reset_data)
   timer_mode = 0;
   start_time = std::chrono::high_resolution_clock::now();
   passed_time = .0;
+
+  center_button_down_r = false;
+  center_button_down_l = false;
 
   W_T_A = realRobot().surfacePose("LeftFootCenter");
   W_p_AcW = W_T_A.translation();
@@ -372,7 +376,7 @@ void SbsController::state_swiching()
     else
       timer_mode = 0;
 
-    if (timer_mode > 0.1)
+    if ((center_button_down_l || center_button_down_r) || timer_mode > 0.1)
     {
       ctrl_mode = 0;
       timer_mode = 0;
@@ -424,7 +428,7 @@ void SbsController::state_swiching()
     if (A_Q_A.norm() < 0.03)
       timer_mode += timeStep;
 
-    if (timer_mode > 0.1)
+    if ((center_button_down_l || center_button_down_r) || timer_mode > 0.1)
     {
       ctrl_mode = 0;
       timer_mode = 0;
@@ -586,4 +590,14 @@ void SbsController::CommandCallback_Right(const geometry_msgs::PointStamped &msg
 
   W_v_B_ref = (W_p_BA_ref - W_p_BA_ref_p) / timeStep;
   W_p_BA_ref_p = W_p_BA_ref;
+}
+
+void SbsController::ButtonChanged_Left(const ros_falcon::FourButtonDown &msg)
+{
+  center_button_down_l = msg.CENTER_BUTTON_DOWN;
+}
+
+void SbsController::ButtonChanged_Right(const ros_falcon::FourButtonDown &msg)
+{
+  center_button_down_r = msg.CENTER_BUTTON_DOWN;
 }

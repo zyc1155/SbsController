@@ -23,6 +23,7 @@ endif()
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   geometry_msgs
+  ros_falcon
 )
 
 catkin_package(CATKIN_DEPENDS roscpp geometry_msgs)

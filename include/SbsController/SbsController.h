@@ -6,6 +6,7 @@
 #include <ros/ros.h>
 #include <ros/callback_queue.h>
 #include "geometry_msgs/PointStamped.h"
+#include "ros_falcon/FourButtonDown.h"
 
 #include "SbsController/api.h"
 
@@ -42,10 +43,13 @@ protected:
 private:
   void CommandCallback_Left(const geometry_msgs::PointStamped &msg);
   void CommandCallback_Right(const geometry_msgs::PointStamped &msg);
+  void ButtonChanged_Left(const ros_falcon::FourButtonDown &msg);
+  void ButtonChanged_Right(const ros_falcon::FourButtonDown &msg);
 
   std::shared_ptr<ros::NodeHandle> nh_;
   ros::CallbackQueue spinner;
   ros::Subscriber right_falcon, left_falcon;
+  ros::Subscriber right_falcon_button, left_falcon_button;
 
   Vector2d dcmGainP_ds, dcmGainP_ss, dcmGainI_ds, dcmGainI_ss, dcmGainD_ds, dcmGainD_ss;
 
@@ -56,6 +60,7 @@ private:
   std::shared_ptr<mc_tasks::lipm_stabilizer::StabilizerTask> lipmTask;
 
   FILE *fp;
+  bool center_button_down_l,center_button_down_r;
   std::chrono::_V2::system_clock::time_point start_time;
   sva::PTransformd anchorFrame;
   double omega;
