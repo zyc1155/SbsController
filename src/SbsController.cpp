@@ -102,7 +102,7 @@ SbsController::SbsController(mc_rbdyn::RobotModulePtr rm, double dt, const mc_rt
                                                   0.5);
                         });
 
-#ifdef USE_FALCONF
+#ifdef USE_FALCON
   // Skip if ROS is not initialized
   if (!mc_rtc::ROSBridge::get_node_handle())
   {
